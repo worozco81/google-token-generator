@@ -6,59 +6,156 @@
         body { font-family: system-ui; background: #f0f2f5; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
         h1 { color: #1a73e8; }
+        .header { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
+        button { background: #1a73e8; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+        button:hover { background: #1557b0; }
+        .btn-success { background: #34a853; }
+        .btn-success:hover { background: #2c8e47; }
         table { width: 100%; background: white; border-radius: 12px; border-collapse: collapse; }
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #f8f9fa; }
-        button { background: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
         .token { font-family: monospace; font-size: 11px; word-break: break-all; max-width: 300px; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 12px; max-width: 500px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 24px; border-radius: 12px; max-width: 500px; width: 90%; }
+        .modal-content input { width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; }
+        .status-connected { color: #0d652d; font-weight: bold; }
+        .status-pending { color: #e37400; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📊 Clientes Conectados</h1>
-        <button onclick="loadClients()">🔄 Actualizar</button>
+        <div class="header">
+            <button onclick="loadClients()">🔄 Actualizar</button>
+            <button class="btn-success" onclick="openGenerateLinkModal()">➕ Generar Link para Cliente</button>
+        </div>
         <table>
-            <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Estado</th><th>Refresh Token</th><th>Acciones</th></tr></thead>
-            <tbody id="clients"></tbody>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Email</th>
+                    <th>Estado</th>
+                    <th>Refresh Token</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="clients">
+                <tr><td colspan="6" style="text-align:center;">No hay clientes. Genera el primer link con el botón verde.</td><td></td><td></td><td></td><td></td><td></td></tr>
+            </tbody>
         </table>
     </div>
-    <div id="modal" class="modal">
+
+    <!-- Modal para generar link -->
+    <div id="modalGenerate" class="modal">
         <div class="modal-content">
-            <h3>Refresh Token</h3>
-            <code id="tokenValue" style="display:block;background:#f4f4f4;padding:10px;margin:10px 0;"></code>
-            <button onclick="copyToken()">Copiar</button>
-            <button onclick="closeModal()">Cerrar</button>
+            <h3>🔗 Generar Link para Cliente</h3>
+            <label>ID del Cliente (único):</label>
+            <input type="text" id="clientId" placeholder="ej: cliente_empresa1">
+            <label>Nombre:</label>
+            <input type="text" id="clientName" placeholder="Nombre del cliente">
+            <label>Email:</label>
+            <input type="email" id="clientEmail" placeholder="email@cliente.com">
+            <button onclick="generateAndCopyLink()" style="margin-top: 10px;">📋 Generar y Copiar Link</button>
+            <button onclick="closeGenerateModal()" style="background: #666;">Cancelar</button>
         </div>
     </div>
+
+    <!-- Modal para mostrar token -->
+    <div id="modalToken" class="modal">
+        <div class="modal-content">
+            <h3>🔑 Refresh Token</h3>
+            <code id="tokenValue" style="display:block;background:#f4f4f4;padding:10px;margin:10px 0;word-break:break-all;"></code>
+            <button onclick="copyToken()">📋 Copiar</button>
+            <button onclick="closeTokenModal()" style="background: #666;">Cerrar</button>
+        </div>
+    </div>
+
     <script>
         const apiKey = new URLSearchParams(location.search).get('api_key');
+        const BASE_URL = window.location.origin;
+
         async function loadClients() {
             const res = await fetch('/api/clients?api_key=' + apiKey);
             const clients = await res.json();
             const tbody = document.getElementById('clients');
+            
+            if (clients.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay clientes. Genera el primer link con el botón verde.</td></tr>';
+                return;
+            }
+            
             tbody.innerHTML = '';
             clients.forEach(c => {
-                tbody.innerHTML += `<tr>
-                    <td>${c.id}</td>
-                    <td>${c.name || '-'}</td>
-                    <td>${c.email || '-'}</td>
-                    <td>${c.has_token ? '✅ Conectado' : '⏳ Pendiente'}</td>
-                    <td class="token">${c.has_token ? '••••••••' : '-'}</td>
-                    <td>${c.has_token ? `<button onclick="getToken('${c.id}')">Ver Token</button>` : `<button onclick="generateLink('${c.id}','${c.name || ''}','${c.email || ''}')">Generar Link</button>`}</td>
-                </tr>`;
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${c.id}</td>
+                        <td>${c.name || '-'}</td>
+                        <td>${c.email || '-'}</td>
+                        <td class="${c.has_token ? 'status-connected' : 'status-pending'}">${c.has_token ? '✅ Conectado' : '⏳ Pendiente'}</td>
+                        <td class="token">${c.has_token ? '••••••••' : '-'}</td>
+                        <td>
+                            ${c.has_token ? 
+                                `<button onclick="getToken('${c.id}')">🔑 Ver Token</button>` : 
+                                `<button onclick="generateLinkForExisting('${c.id}', '${c.name || ''}', '${c.email || ''}')">🔗 Link</button>`
+                            }
+                        </td>
+                    </tr>
+                `;
             });
         }
+
+        function openGenerateLinkModal() {
+            document.getElementById('modalGenerate').style.display = 'flex';
+        }
+
+        function closeGenerateModal() {
+            document.getElementById('modalGenerate').style.display = 'none';
+            document.getElementById('clientId').value = '';
+            document.getElementById('clientName').value = '';
+            document.getElementById('clientEmail').value = '';
+        }
+
+        function generateAndCopyLink() {
+            const id = document.getElementById('clientId').value;
+            const name = document.getElementById('clientName').value;
+            const email = document.getElementById('clientEmail').value;
+            
+            if (!id) {
+                alert('El ID del cliente es obligatorio');
+                return;
+            }
+            
+            const link = `${BASE_URL}/connect/${id}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+            navigator.clipboard.writeText(link);
+            alert('✅ Link copiado al portapapeles\n\nEnvía este link al cliente:\n' + link);
+            closeGenerateModal();
+            loadClients();
+        }
+
+        function generateLinkForExisting(id, name, email) {
+            const link = `${BASE_URL}/connect/${id}?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+            navigator.clipboard.writeText(link);
+            alert('✅ Link copiado al portapapeles\n\nEnvía este link al cliente:\n' + link);
+        }
+
         async function getToken(id) {
             const res = await fetch('/api/token/' + id + '?api_key=' + apiKey);
             const data = await res.json();
             document.getElementById('tokenValue').innerText = data.refresh_token;
-            document.getElementById('modal').style.display = 'flex';
+            document.getElementById('modalToken').style.display = 'flex';
         }
-        function copyToken() { navigator.clipboard.writeText(document.getElementById('tokenValue').innerText); alert('Copiado'); }
-        function generateLink(id,name,email) { prompt('Link para el cliente:', location.origin + '/connect/' + id + '?name=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email)); }
-        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+        function copyToken() {
+            const token = document.getElementById('tokenValue').innerText;
+            navigator.clipboard.writeText(token);
+            alert('✅ Token copiado al portapapeles');
+        }
+
+        function closeTokenModal() {
+            document.getElementById('modalToken').style.display = 'none';
+        }
+
         loadClients();
     </script>
 </body>
