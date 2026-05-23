@@ -7,20 +7,34 @@ const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Google Token Generator API', 
-    status: 'ok',
+    status: 'active',
+    version: '1.0.0',
     endpoints: {
-      dashboard: '/dashboard',
-      connect: '/connect/:clientId',
-      health: '/health'
+      health: '/health',
+      info: '/info'
     }
   });
 });
 
 // Ruta de salud
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
 });
 
-app.listen(PORT, () => {
-  console.log('Server running on port', PORT);
+// Ruta de información
+app.get('/info', (req, res) => {
+  res.json({
+    service: 'Google Token Generator',
+    environment: process.env.NODE_ENV || 'production',
+    node_version: process.version
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Health check: http://localhost:${PORT}/health`);
 });
