@@ -1,0 +1,15 @@
+{
+  "name": "google-token-generator",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "googleapis": "^134.0.0",
+    "sqlite3": "^5.1.6",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.1"
+  }
+}
